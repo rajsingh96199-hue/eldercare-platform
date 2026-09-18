@@ -1,0 +1,13 @@
+{
+  "name": "eldercare-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ElderCare - Elderly Nursing & Healthcare Assistance Platform",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "build": "cd backend && npm run build && cd ../frontend && npm run build",
+    "test:backend": "cd backend && npm test",
+    "seed": "cd backend && npx prisma db push && npx ts-node prisma/seed.ts"
+  }
+}

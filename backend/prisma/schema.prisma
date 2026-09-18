@@ -1,0 +1,219 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String
+  role             String            @default("FAMILY") // "FAMILY", "CAREGIVER", "ADMIN"
+  fullName         String
+  phone            String?
+  avatar           String?
+  address          String?
+  city             String?
+  emergencyContact String?
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  caregiverProfile CaregiverProfile?
+  patients         Patient[]
+  bookings         Booking[]         @relation("FamilyBookings")
+  caregiverBookings Booking[]        @relation("CaregiverBookings")
+  reviewsGiven     Review[]          @relation("UserReviews")
+  complaintsFiled  Complaint[]       @relation("ComplaintsFiled")
+  complaintsAgainst Complaint[]      @relation("ComplaintsAgainst")
+  notifications    Notification[]
+}
+
+model CaregiverProfile {
+  id                  String             @id @default(uuid())
+  userId              String             @unique
+  user                User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title               String             @default("Professional Caregiver")
+  bio                 String
+  yearsExperience     Int                @default(1)
+  hourlyRate          Float              @default(25.0)
+  dailyRate           Float              @default(180.0)
+  qualifications      String             // JSON string or comma separated
+  specializations     String             // JSON string or comma separated
+  serviceAreas        String             // JSON string or comma separated
+  languages           String             @default("English")
+  isVerified          Boolean            @default(false)
+  verificationStatus  String             @default("PENDING") // "PENDING", "VERIFIED", "REJECTED", "SUSPENDED"
+  verificationNotes   String?
+  ratingAvg           Float              @default(5.0)
+  ratingCount         Int                @default(0)
+  totalHoursCompleted Float              @default(0)
+  isAvailable         Boolean            @default(true)
+  documents           VerificationDocument[]
+  reviewsReceived     Review[]           @relation("CaregiverReviews")
+  careNotes           CareNote[]
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
+}
+
+model VerificationDocument {
+  id          String             @id @default(uuid())
+  caregiverId String
+  caregiver   CaregiverProfile   @relation(fields: [caregiverId], references: [id], onDelete: Cascade)
+  type        String             // e.g. "GOVT_ID", "NURSING_LICENSE", "POLICE_CLEARANCE", "CPR_CERTIFICATE"
+  name        String
+  fileUrl     String
+  status      String             @default("PENDING") // "PENDING", "VERIFIED", "REJECTED"
+  notes       String?
+  uploadedAt  DateTime           @default(now())
+}
+
+model Patient {
+  id                    String      @id @default(uuid())
+  familyUserId          String
+  familyUser            User        @relation(fields: [familyUserId], references: [id], onDelete: Cascade)
+  fullName              String
+  age                   Int
+  gender                String
+  relationship          String      // e.g., "Mother", "Father", "Grandparent", "Self"
+  medicalConditions     String?     // e.g. "Hypertension, Post-stroke recovery"
+  allergies             String?
+  mobilityLevel         String      @default("Independent") // "Independent", "Needs Cane/Walker", "Bedridden", "Wheelchair"
+  dietaryNeeds          String?
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  doctorName            String?
+  doctorPhone           String?
+  notes                 String?
+  createdAt             DateTime    @default(now())
+  updatedAt             DateTime    @updatedAt
+
+  bookings              Booking[]
+  careNotes             CareNote[]
+}
+
+model Service {
+  id             String    @id @default(uuid())
+  slug           String    @unique
+  title          String
+  shortDesc      String
+  description    String
+  icon           String    @default("HeartHandshake")
+  baseHourlyRate Float
+  baseDailyRate  Float
+  features       String    // JSON string list of features
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  bookings       Booking[]
+}
+
+model Booking {
+  id                  String         @id @default(uuid())
+  bookingNumber       String         @unique
+  familyUserId        String
+  familyUser          User           @relation("FamilyBookings", fields: [familyUserId], references: [id], onDelete: Cascade)
+  caregiverUserId     String
+  caregiverUser       User           @relation("CaregiverBookings", fields: [caregiverUserId], references: [id], onDelete: Cascade)
+  patientId           String
+  patient             Patient        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  serviceId           String
+  service             Service        @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  bookingType         String         @default("HOURLY") // "HOURLY", "DAILY", "LONG_TERM"
+  startDate           DateTime
+  endDate             DateTime?
+  startTime           String?
+  endTime             String?
+  totalHours          Float          @default(4)
+  hourlyRate          Float
+  totalAmount         Float
+  platformFee         Float          @default(0)
+  caregiverPayout     Float          @default(0)
+  status              String         @default("PENDING") // "PENDING", "ACCEPTED", "ON_THE_WAY", "ARRIVED", "IN_PROGRESS", "COMPLETED", "REJECTED", "CANCELLED", "DISPUTED"
+  serviceAddress      String
+  city                String
+  specialInstructions String?
+  cancellationReason  String?
+  rejectionReason     String?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  careNotes           CareNote[]
+  review              Review?
+  complaints          Complaint[]
+}
+
+model CareNote {
+  id                      String           @id @default(uuid())
+  bookingId               String
+  booking                 Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  caregiverProfileId      String
+  caregiverProfile        CaregiverProfile @relation(fields: [caregiverProfileId], references: [id], onDelete: Cascade)
+  patientId               String
+  patient                 Patient          @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  date                    DateTime         @default(now())
+  bloodPressure           String?          // e.g. "120/80 mmHg"
+  bloodSugar              String?          // e.g. "110 mg/dL"
+  pulseRate               Int?             // bpm
+  temperature             Float?           // Fahrenheit/Celsius
+  oxygenLevel             Int?             // SpO2 percentage
+  medicationsAdministered String?          // JSON list or string
+  dietNotes               String?
+  mobilityExercises       String?
+  moodState               String?          // "Cheerful", "Calm", "Fatigued", "Confused", "Agitated"
+  notes                   String
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+}
+
+model Review {
+  id                 String           @id @default(uuid())
+  bookingId          String           @unique
+  booking            Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User             @relation("UserReviews", fields: [userId], references: [id], onDelete: Cascade)
+  caregiverProfileId String
+  caregiverProfile   CaregiverProfile @relation("CaregiverReviews", fields: [caregiverProfileId], references: [id], onDelete: Cascade)
+  rating             Int              // 1 to 5
+  comment            String
+  punctualityRating  Int?             @default(5)
+  careQualityRating  Int?             @default(5)
+  communicationRating Int?            @default(5)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+}
+
+model Complaint {
+  id              String            @id @default(uuid())
+  ticketNumber    String            @unique
+  bookingId       String
+  booking         Booking           @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User              @relation("ComplaintsFiled", fields: [userId], references: [id], onDelete: Cascade)
+  againstUserId   String?
+  againstUser     User?             @relation("ComplaintsAgainst", fields: [againstUserId], references: [id], onDelete: SetNull)
+  subject         String
+  description     String
+  priority        String            @default("MEDIUM") // "LOW", "MEDIUM", "HIGH", "URGENT"
+  status          String            @default("OPEN") // "OPEN", "INVESTIGATING", "RESOLVED", "REJECTED"
+  adminResolution String?
+  resolvedAt      DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   @default("INFO") // "BOOKING", "CARE_NOTE", "VERIFICATION", "SYSTEM", "ALERT"
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
